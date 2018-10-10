@@ -20,7 +20,7 @@ class Client(QDialog):
         self.width = 500
         self.height = 500
         self.bulb_image_off = QPixmap('images/pin_off.png')
-        self.bulb_image_on = QPixmap('images/pin_off.png')
+        self.bulb_image_on = QPixmap('images/pin_on.png')
         self.initUI()
         self.refresh_pin_statuses()
 
@@ -69,7 +69,7 @@ class Client(QDialog):
         self.bulbs = []
 
         for i in range(40):
-            pin_name = "pin{}".format(i+1) if (i+1) not in pin_names.keys() else pin_names[i+1]
+            pin_name = "PIN{}".format(i+1) if (i+1) not in pin_names.keys() else pin_names[i+1]
 
             if i%2 == 1:
                 button_column = 7
@@ -105,7 +105,7 @@ class Client(QDialog):
     def toggle_pin(self, pin):
         set_pin_to_high = not self.statuses[pin-1]
         control_pin = SetPin(pin, set_pin_to_high).get_binary()
-        response = self.communicate_with_server(control_pin).from_binary()
+        response = self.communicate_with_server(control_pin)
         if response.success:
             self.statuses[pin-1] = response.state
             self.bulbs[pin-1].setPixmap(self.bulb_image_on if response.state else self.bulb_image_off)
