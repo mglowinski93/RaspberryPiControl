@@ -1,13 +1,35 @@
 import sys
 import socket
 from functools import partial
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QDialog, QVBoxLayout, QGridLayout, QLabel, QGroupBox
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QDialog, QVBoxLayout, QGridLayout, QLabel,\
+    QGroupBox, QMessageBox
 from PyQt5.QtGui import QPainter, QPixmap
+from PyQt5.QtCore import QThread, pyqtSignal
 from settings import pin_names, pins_to_control
 from protocol import SetPin, Response, CheckPins, CheckPinsResponse, from_binary
 
 HOST = '192.168.0.103'
 PORT = 8888
+
+class Communicate(QThread):
+    received = pyqtSignal(bytes)
+    connection_interrupt = pyqtSignal()
+
+    def __init__(self, message):
+        self.message = message
+        self.HOST = HOST
+        self.PORT = PORT
+        super().__init__()
+
+    def run(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.connect((HOST, PORT))
+                s.sendall(self.message)
+                data = s.recv(1024)
+                self.received.emit(data)
+            except socket.error:
+                self.connection_interrupt.emit()
 
 class Client(QDialog):
     def __init__(self):
@@ -19,18 +41,26 @@ class Client(QDialog):
         self.top = 500
         self.width = 500
         self.height = 500
+        self.threads = []
         self.bulb_image_off = QPixmap('images/pin_off.png')
         self.bulb_image_on = QPixmap('images/pin_on.png')
         self.initUI()
         self.refresh_pin_statuses()
 
+    def parse_response(self, data):
+        response = from_binary(data)
+        print('Received: {}'.format(response))
+
+    def connection_problem(self):
+        print('Problem occured while connecting with {}:{}'.format(self.HOST, self.PORT))
+        QMessageBox.information(self, 'Connection interrupted', "Problem occured while accessing {}:{}".format(self.HOST, self.PORT))
+
     def communicate_with_server(self, message):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((self.HOST, self.PORT))
-            s.sendall(message)
-            data = s.recv(1024)
-        print('Received', repr(data))
-        return from_binary(data)
+        thread = Communicate(message)
+        thread.connection_interrupt.connect(self.connection_problem)
+        thread.received.connect(self.parse_response)
+        thread.start()
+        self.threads.append(thread)
 
     def refresh_pin_statuses(self):
         response = self.communicate_with_server(CheckPins().get_binary())
@@ -106,9 +136,10 @@ class Client(QDialog):
         set_pin_to_high = not self.statuses[pin-1]
         control_pin = SetPin(pin, set_pin_to_high).get_binary()
         response = self.communicate_with_server(control_pin)
-        if response.success:
-            self.statuses[pin-1] = response.state
-            self.bulbs[pin-1].setPixmap(self.bulb_image_on if response.state else self.bulb_image_off)
+        if isinstance(response, Response):
+            if response.success:
+                self.statuses[pin-1] = response.state
+                self.bulbs[pin-1].setPixmap(self.bulb_image_on if response.state else self.bulb_image_off)
 
 app = QApplication(sys.argv)
 ex = Client()
