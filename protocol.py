@@ -58,5 +58,5 @@ command_dict = {
 }
 
 def from_binary(data):
-    response = json.loads(data)
+    response = json.loads(data.decode())
     return command_dict[response['MessageType']].from_dict(response)
