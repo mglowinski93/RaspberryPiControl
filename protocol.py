@@ -48,7 +48,7 @@ class CheckPins(Message):
 
 class CheckPinsResponse(Message):
     message_type = CHECK_PINS_RESPONSE
-    fields = []
+    fields = ['statuses']
 
 command_dict = {
     SET_PIN: SetPin,
