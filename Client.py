@@ -50,6 +50,10 @@ class Client(QDialog):
     def parse_response(self, data):
         response = from_binary(data)
         print('Received: {}'.format(response))
+        if isinstance(response, Response):
+            if response.success:
+                self.statuses[response.pin] = response.state
+                self.bulbs[response.pin].setPixmap(self.bulb_image_on if response.state else self.bulb_image_off)
 
     def connection_problem(self):
         print('Problem occured while connecting with {}:{}'.format(self.HOST, self.PORT))
@@ -135,11 +139,7 @@ class Client(QDialog):
     def toggle_pin(self, pin):
         set_pin_to_high = not self.statuses[pin-1]
         control_pin = SetPin(pin, set_pin_to_high).get_binary()
-        response = self.communicate_with_server(control_pin)
-        if isinstance(response, Response):
-            if response.success:
-                self.statuses[pin-1] = response.state
-                self.bulbs[pin-1].setPixmap(self.bulb_image_on if response.state else self.bulb_image_off)
+        self.communicate_with_server(control_pin)
 
 app = QApplication(sys.argv)
 ex = Client()
