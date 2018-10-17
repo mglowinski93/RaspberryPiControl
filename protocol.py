@@ -13,7 +13,7 @@ class Message():
 
     @classmethod
     def from_dict(cls, d):
-        argument_list = [d[field] for field in self.fields]
+        argument_list = [d[field] for field in cls.fields]
         return cls(*argument_list)
 
     def get_binary(self):
