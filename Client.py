@@ -36,7 +36,7 @@ class Client(QDialog):
         super().__init__()
         self.HOST = '192.168.0.103'
         self.PORT = 8888
-        self.title = 'RaspberryPi Controll'
+        self.title = 'RaspberryPi Control'
         self.left = 500
         self.top = 500
         self.width = 500
@@ -97,12 +97,13 @@ class Client(QDialog):
     def createGridLayout(self):
         self.horizontalGroupBox = QGroupBox("Connected to {}:{}".format(self.HOST, self.PORT))
         layout = QGridLayout()
-        layout.setColumnStretch(1, 1)
+        layout.setSpacing(0)
+        layout.setColumnStretch(1, 0)
         layout.setColumnStretch(2, 1)
-        layout.setColumnStretch(3, 1)
+        layout.setColumnStretch(3, 0)
         layout.setColumnStretch(4, 1)
-        layout.setColumnStretch(5, 1)
-        layout.setColumnStretch(6, 1)
+        layout.setColumnStretch(5, 0)
+        layout.setColumnStretch(6, 0)
         layout.setColumnStretch(7, 1)
         layout.setColumnStretch(8, 1)
 
