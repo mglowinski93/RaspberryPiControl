@@ -63,7 +63,7 @@ python-dateutil==2.7.2
 python-stdnum==1.9
 pytz==2018.3
 PyVirtualDisplay==0.2.1
-pywin32==216
+pywin32==301
 query-string==0.0.28
 readchar==2.0.1
 request==0.0.26
