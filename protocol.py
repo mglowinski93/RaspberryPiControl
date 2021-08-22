@@ -1,79 +1,62 @@
 from enum import IntEnum
-import struct
+import struct, json
 
-class MessageType(IntEnum):
-    SET_PIN = 1
-    RESPONSE = 2
-    CHECK_PINS_STATUS = 3
-    CHECK_PINS_RESPONSE = 4
+SET_PIN = 'SET_PIN'
+RESPONSE_PIN = 'RESPONSE_PIN'
+CHECK_PINS_STATUS = 'CHECK_PINS_STATUS'
+CHECK_PINS_RESPONSE = 'CHECK_PINS_RESPONSE'
 
-class SetPin():
-    def __init__(self, pin, state):
-        self.pin = pin
-        self.state = state
+class Message():
+    def __init__(self, *args):
+        for arg, field in zip(args, self.fields):
+            setattr(self, field, arg)
+
+    @classmethod
+    def from_dict(cls, d):
+        argument_list = [d[field] for field in cls.fields]
+        return cls(*argument_list)
+
+    def get_binary(self):
+        data_dict = {}
+        for field in self.fields:
+            data_dict[field] = getattr(self, field)
+        data_dict["MessageType"] = self.message_type
+        return json.dumps(data_dict).encode('utf-8')
+
+
+class SetPin(Message):
+    message_type = SET_PIN
+    fields = ['pin', 'state']
 
     def __str__(self):
         return "set pin {} to {}".format(self.pin, self.state)
 
-    def get_binary(self):
-        return struct.pack('BBB', MessageType.SET_PIN, self.pin, self.state)
-
-    @classmethod
-    def from_binary(cls, data):
-        '''
-        Function which will return class object
-        '''
-        _, pin, state = struct.unpack('BBB', data)
-        return cls(pin, state)
-
-class Response():
-    def __init__(self, pin, state, success):
-        self.pin = pin
-        self.state = state
-        self.success = success
+class Response(Message):
+    message_type = RESPONSE_PIN
+    fields = ['pin', 'state', 'success']
 
     def __str__(self):
-        return "Pin {} was set to {}".format(self.pin, self.state)
+        if self.success:
+            message = "Pin {} was set to {}".format(self.pin, self.state)
+        else:
+            message = "Pin {} was not set to {}".format(self.pin, self.state)
+        return message
 
-    def get_binary(self):
-        return struct.pack('BBB?', MessageType.RESPONSE, self.pin, self.state, self.success)
+class CheckPins(Message):
+    message_type = CHECK_PINS_STATUS
+    fields = []
 
-    @classmethod
-    def from_binary(cls, data):
-        _, pin, state, success = struct.unpack('BBB?', data)
-        return cls(pin, state, success)
-
-
-class CheckPins():
-    def get_binary(self):
-        return struct.pack('B', MessageType.CHECK_PINS_STATUS)
-
-    @classmethod
-    def from_binary(cls, data):
-        return cls()
-
-class CheckPinsResponse():
-    def __init__(self, statuses):
-        self.statuses = statuses
-
-    def get_binary(self):
-        head = struct.pack('BB', MessageType.CHECK_PINS_RESPONSE, len(self.statuses))
-        body = bytes(self.statuses)
-        return head + body
-
-    @classmethod
-    def from_binary(cls, data):
-        _, size = struct.unpack('BB', data[0:2])
-        statuses = list(data[2:size+2])
-        return cls(statuses)
+class CheckPinsResponse(Message):
+    message_type = CHECK_PINS_RESPONSE
+    fields = ['statuses']
 
 command_dict = {
-    MessageType.SET_PIN: SetPin,
-    MessageType.RESPONSE: Response,
-    MessageType.CHECK_PINS_STATUS: CheckPins,
-    MessageType.CHECK_PINS_RESPONSE: CheckPinsResponse,
+    SET_PIN: SetPin,
+    RESPONSE_PIN: Response,
+    CHECK_PINS_STATUS: CheckPins,
+    CHECK_PINS_RESPONSE: CheckPinsResponse,
 }
 
 def from_binary(data):
-    command = data[0]
-    return command_dict[command].from_binary(data)
+    response = json.loads(data.decode())
+    return command_dict[response['MessageType']].from_dict(response)

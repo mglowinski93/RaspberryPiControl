@@ -3,7 +3,7 @@ import socket
 from functools import partial
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QDialog, QVBoxLayout, QGridLayout, QLabel,\
     QGroupBox, QMessageBox
-from PyQt5.QtGui import QPainter, QPixmap
+from PyQt5.QtGui import QPainter, QPixmap, QMovie
 from PyQt5.QtCore import QThread, pyqtSignal
 from settings import pin_names, pins_to_control
 from protocol import SetPin, Response, CheckPins, CheckPinsResponse, from_binary
@@ -36,14 +36,16 @@ class Client(QDialog):
         super().__init__()
         self.HOST = '192.168.0.103'
         self.PORT = 8888
-        self.title = 'RaspberryPi Controll'
+        self.title = 'RaspberryPi Control'
         self.left = 500
         self.top = 500
         self.width = 500
         self.height = 500
-        self.threads = []
+        self.threads = {}
         self.bulb_image_off = QPixmap('images/pin_off.png')
         self.bulb_image_on = QPixmap('images/pin_on.png')
+        self.spinner = QMovie('images/spinner.gif')
+        self.spinner.start()
         self.initUI()
         self.refresh_pin_statuses()
 
@@ -52,8 +54,15 @@ class Client(QDialog):
         print('Received: {}'.format(response))
         if isinstance(response, Response):
             if response.success:
-                self.statuses[response.pin] = response.state
-                self.bulbs[response.pin].setPixmap(self.bulb_image_on if response.state else self.bulb_image_off)
+                self.statuses[response.pin-1] = response.state
+                self.bulbs[response.pin-1].setPixmap(self.bulb_image_on if response.state else self.bulb_image_off)
+                self.toggle_buttons[response.pin-1].setEnabled(True)
+        if isinstance(response, CheckPinsResponse):
+            for pin, bulb in zip(response.statuses, self.bulbs):
+                bulb.setPixmap(self.bulb_image_on) if pin else bulb.setPixmap(self.bulb_image_off)
+            self.statuses = response.statuses
+            for button in self.toggle_buttons.values():
+                button.setEnabled(True)
 
     def connection_problem(self):
         print('Problem occured while connecting with {}:{}'.format(self.HOST, self.PORT))
@@ -61,17 +70,17 @@ class Client(QDialog):
 
     def communicate_with_server(self, message):
         thread = Communicate(message)
+        self.threads[id(thread)] = thread
         thread.connection_interrupt.connect(self.connection_problem)
         thread.received.connect(self.parse_response)
+        thread.finished.connect(partial(self.delete_thread, id(thread)))
         thread.start()
-        self.threads.append(thread)
+
+    def delete_thread(self, id):
+        del self.threads[id]
 
     def refresh_pin_statuses(self):
         response = self.communicate_with_server(CheckPins().get_binary())
-        if isinstance(response, CheckPinsResponse):
-            for pin, bulb in zip(response.statuses, self.bulbs):
-                bulb.setPixmap(self.bulb_image_on) if pin else bulb.setPixmap(self.bulb_image_off)
-            self.statuses = response.statuses
 
     def initUI(self):
         self.setWindowTitle(self.title)
@@ -88,12 +97,13 @@ class Client(QDialog):
     def createGridLayout(self):
         self.horizontalGroupBox = QGroupBox("Connected to {}:{}".format(self.HOST, self.PORT))
         layout = QGridLayout()
-        layout.setColumnStretch(1, 1)
+        layout.setSpacing(0)
+        layout.setColumnStretch(1, 0)
         layout.setColumnStretch(2, 1)
-        layout.setColumnStretch(3, 1)
+        layout.setColumnStretch(3, 0)
         layout.setColumnStretch(4, 1)
-        layout.setColumnStretch(5, 1)
-        layout.setColumnStretch(6, 1)
+        layout.setColumnStretch(5, 0)
+        layout.setColumnStretch(6, 0)
         layout.setColumnStretch(7, 1)
         layout.setColumnStretch(8, 1)
 
@@ -101,6 +111,7 @@ class Client(QDialog):
         pin_image_rotated_raw = QPixmap('images/pin_rotated.png')
 
         self.bulbs = []
+        self.toggle_buttons = {}
 
         for i in range(40):
             pin_name = "PIN{}".format(i+1) if (i+1) not in pin_names.keys() else pin_names[i+1]
@@ -130,13 +141,17 @@ class Client(QDialog):
             if (i+1) in pins_to_control:
                 toggle_button = QPushButton('Toggle')
                 toggle_button.clicked.connect(partial(self.toggle_pin, i+1))
+                self.toggle_buttons[i] = toggle_button
                 layout.addWidget(toggle_button, row, button_column)
+                toggle_button.setEnabled(False)
             layout.addWidget(QLabel(pin_name), row, name_column)
             layout.addWidget(image_label, row, picture_column)
 
         self.horizontalGroupBox.setLayout(layout)
 
     def toggle_pin(self, pin):
+        self.toggle_buttons[pin-1].setEnabled(False)
+        self.bulbs[pin-1].setMovie(self.spinner)
         set_pin_to_high = not self.statuses[pin-1]
         control_pin = SetPin(pin, set_pin_to_high).get_binary()
         self.communicate_with_server(control_pin)
