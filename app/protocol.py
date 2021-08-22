@@ -1,12 +1,12 @@
-from enum import IntEnum
-import struct, json
+import json
 
-SET_PIN = 'SET_PIN'
-RESPONSE_PIN = 'RESPONSE_PIN'
-CHECK_PINS_STATUS = 'CHECK_PINS_STATUS'
-CHECK_PINS_RESPONSE = 'CHECK_PINS_RESPONSE'
+SET_PIN = "SET_PIN"
+RESPONSE_PIN = "RESPONSE_PIN"
+CHECK_PINS_STATUS = "CHECK_PINS_STATUS"
+CHECK_PINS_RESPONSE = "CHECK_PINS_RESPONSE"
 
-class Message():
+
+class Message:
     def __init__(self, *args):
         for arg, field in zip(args, self.fields):
             setattr(self, field, arg)
@@ -21,19 +21,20 @@ class Message():
         for field in self.fields:
             data_dict[field] = getattr(self, field)
         data_dict["MessageType"] = self.message_type
-        return json.dumps(data_dict).encode('utf-8')
+        return json.dumps(data_dict).encode("utf-8")
 
 
 class SetPin(Message):
     message_type = SET_PIN
-    fields = ['pin', 'state']
+    fields = ["pin", "state"]
 
     def __str__(self):
         return "set pin {} to {}".format(self.pin, self.state)
 
+
 class Response(Message):
     message_type = RESPONSE_PIN
-    fields = ['pin', 'state', 'success']
+    fields = ["pin", "state", "success"]
 
     def __str__(self):
         if self.success:
@@ -42,13 +43,16 @@ class Response(Message):
             message = "Pin {} was not set to {}".format(self.pin, self.state)
         return message
 
+
 class CheckPins(Message):
     message_type = CHECK_PINS_STATUS
     fields = []
 
+
 class CheckPinsResponse(Message):
     message_type = CHECK_PINS_RESPONSE
-    fields = ['statuses']
+    fields = ["statuses"]
+
 
 command_dict = {
     SET_PIN: SetPin,
@@ -57,6 +61,7 @@ command_dict = {
     CHECK_PINS_RESPONSE: CheckPinsResponse,
 }
 
+
 def from_binary(data):
     response = json.loads(data.decode())
-    return command_dict[response['MessageType']].from_dict(response)
+    return command_dict[response["MessageType"]].from_dict(response)
