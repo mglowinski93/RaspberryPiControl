@@ -1,4 +1,4 @@
-# Bloggy
+# RaspberryPi Control
 
 GUI application for controlling pins on RaspberryPi.
 
